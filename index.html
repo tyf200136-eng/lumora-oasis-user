@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>عرض الخريطة - واحة لومورا</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <a href="index.html" class="btn btn-primary">عرض الخريطة</a>
+  <nav class="main-nav">
+    <a href="#" class="">تعرف علينا</a>
+    <a href="#" class="">أشهر الإعلانات</a>
+    <a href="#" class="">تواصل معنا</a>
+  </nav>
+  <div class="logo">
+    <img src="assets/logo.png" alt="LUMORA OASIS">
+  </div>
+</header>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="island.js"></script>
+
+<div class="page-wrap" style="padding-top:10px;">
+  <div class="island-wrap" style="height:820px;position:relative;">
+    <div id="island-container" class="island-canvas-host"></div>
+
+    <div class="filter-panel" id="filter-panel" style="left:20px;right:auto;">
+      <h3 onclick="toggleFilterPanel()" style="cursor:pointer;">
+        تصفية الاعلانات
+        <span id="filter-chevron" style="color:var(--text-2);display:inline-block;transition:transform .2s ease;">⌄</span>
+      </h3>
+      <div id="filter-body">
+        <label>البحث عن إعلان</label>
+        <input type="text" placeholder="سجل اسم ...">
+        <label>نوع الإعلان</label>
+        <select><option>مطاعم</option><option>سيارات</option><option>تقنية</option></select>
+        <label>ترتيب النتائج</label>
+        <select><option>الأعلى مشاهدة</option><option>الأحدث</option><option>الأقل سعر</option></select>
+        <button class="btn btn-primary btn-block" style="margin-top:18px;">تصفية النتائج</button>
+      </div>
+    </div>
+
+    <div class="zoom-controls">
+      <button onclick="window.__islandZoomIn && window.__islandZoomIn()">+</button>
+      <button onclick="window.__islandZoomOut && window.__islandZoomOut()">−</button>
+    </div>
+
+    <div id="island-hint" class="island-hint">اسحب لتدوير الجزيرة، انقر على أي لوحة لعرض تفاصيلها</div>
+
+    <!-- الصورة الكبيرة بمنتصف الجزيرة: تطلع فوق اللوحة اللي انضغطت بالظبط -->
+    <div id="ad-center-image" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;transition:opacity .25s ease;">
+      <img id="ad-center-image-img" src="" style="max-width:420px;max-height:520px;width:auto;height:auto;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,0.65);border:3px solid rgba(255,255,255,0.18);display:block;">
+    </div>
+
+    <!-- بطاقة وصف الإعلان: مخفية افتراضيًا، تظهر فوق الجزيرة عند الضغط على لوحة -->
+    <div id="ad-overlay-card" class="ad-side-card" style="display:none;position:absolute;top:20px;right:20px;left:auto;width:440px;max-height:calc(100% - 40px);overflow-y:auto;background:rgba(10,13,32,0.9);backdrop-filter:blur(10px);border:1px solid var(--border);z-index:6;">
+      <div class="ad-image" style="height:230px;">
+        <img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?w=900&q=80" alt="سيارة">
+
+        <div class="ad-badges" style="gap:10px;">
+          <span class="pill" style="background:rgba(10,13,32,0.75);padding:8px 16px;font-size:14px;font-weight:700;gap:8px;">
+            <img class="icon-svg-sm" src="assets/heart.svg" style="width:18px;height:18px;"> 350
+          </span>
+          <span class="pill" style="background:rgba(10,13,32,0.75);padding:8px 16px;font-size:14px;font-weight:700;gap:8px;">
+            <img class="icon-svg-sm" src="assets/eye.svg" style="width:18px;height:18px;"> 700
+          </span>
+        </div>
+
+        <div class="ad-icons" style="gap:10px;">
+          <span style="background:var(--blue);width:40px;height:40px;">
+            <img class="icon-svg-sm" src="assets/heart-outline.png" style="width:18px;height:18px;">
+          </span>
+          <span style="background:var(--blue);width:40px;height:40px;">
+            <img class="icon-svg-sm" src="assets/bookmark-outline.png" style="width:18px;height:18px;">
+          </span>
+          <span style="background:var(--blue);width:40px;height:40px;">
+            <img class="icon-svg-sm" src="assets/uiw_share.png" style="width:18px;height:18px;filter:brightness(0) invert(1);">
+          </span>
+          
+        </div>
+
+        <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;">
+          <span style="width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.4);display:block;"></span>
+          <span style="width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.4);display:block;"></span>
+          <span style="width:5px;height:5px;border-radius:50%;background:var(--blue-light);display:block;"></span>
+        </div>
+      </div>
+      <div class="ad-body">
+        <h2>تأجير سيارات معرض الرائد</h2>
+        <p>استأجر سيارتك بكل سهولة من معرض الرائد لتأجير السيارات. نوفر مجموعة متنوعة من السيارات الحديثة بأسعار مناسبة وخدمة موثوقة لتلبية احتياجاتك اليومية أو السفر.</p>
+
+        <h3 style="font-size:15px;margin:0 0 10px;">المميزات</h3>
+        <ul class="feature-list">
+          <li>🚗 سيارات حديثة ومتنوعة</li>
+          <li>💰 أسعار مناسبة وعروض مميزة</li>
+          <li>📅 تأجير يومي أو شهري</li>
+          <li>⚡ إجراءات حجز سريعة وسهلة</li>
+          <li>🔧 سيارات مفحوصة وجاهزة للاستخدام</li>
+          <li>📍 موقع سهل الوصول وخدمة عملاء متوفرة</li>
+        </ul>
+
+        <h3 style="font-size:15px;margin:0 0 10px;">روابط ذات صلة</h3>
+        <div class="related-links">
+          <a href="#" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-bottom: 8px; text-decoration: none; color: inherit;">
+            <span>الموقع الجغرافي http:\map.gh</span>
+            <img class="icon-svg-sm" src="assets/sharp_link-share-2-solid.png">
+          </a>
+          <a href="#" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px; text-decoration: none; color: inherit;">
+            <span>الموقع الإلكتروني www.info.com</span>
+            <img class="icon-svg-sm" src="assets/sharp_link-share-2-solid.png">
+          </a>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" style="margin-bottom:10px;"><img class="icon-svg-sm" src="assets/call.svg"> 96650912344</button>
+        <button class="btn btn-whatsapp btn-block btn-lg">💬 WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleFilterPanel() {
+    const body = document.getElementById('filter-body');
+    const chevron = document.getElementById('filter-chevron');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+  }
+
+  function showAdOverlay(adIndex) {
+    document.getElementById('ad-overlay-card').style.display = 'block';
+    document.getElementById('island-hint').style.opacity = '0';
+
+    const imgUrl = (window.LUMORA_BILLBOARD_IMAGES && window.LUMORA_BILLBOARD_IMAGES[adIndex]) || null;
+    const centerBox = document.getElementById('ad-center-image');
+    const centerImg = document.getElementById('ad-center-image-img');
+    if (imgUrl) {
+      centerImg.src = imgUrl;
+      centerBox.style.display = 'block';
+    }
+  }
+  function hideAdOverlay() {
+    document.getElementById('ad-overlay-card').style.display = 'none';
+    document.getElementById('ad-center-image').style.display = 'none';
+  }
+
+  initIslandViewer('island-container', {
+    onBoardClick: function (adIndex) { showAdOverlay(adIndex); },
+    onEmptyClick: function () { hideAdOverlay(); }
+  });
+</script>
+
+<footer class="site-footer" style="background:#141d42;">
+  <div class="footer-grid">
+    <div class="footer-col">
+      <div class="logo" style="margin-bottom:14px;">
+        <img src="assets/logo-large.png" alt="LUMORA OASIS" style="height:56px;">
+      </div>
+      <p>منصة رقمية متخصصة في توفير مساحات إعلانية افتراضية داخل بيئة ثلاثية الأبعاد تفاعلية.</p>
+    </div>
+    <div class="footer-col">
+      <h4>صفحات الموقع</h4>
+      <a href="#">تعرف علينا</a>
+      <a href="#">الاعلانات</a>
+      <a href="#">سجل معنا</a>
+      <a href="index.html">عرض الخريطة</a>
+    </div>
+    <div class="footer-col">
+      <h4>صفحات تهمك</h4>
+      <a href="#">شروط والاحكام</a>
+      <a href="#">سياسية الخصوصية</a>
+    </div>
+    <div class="footer-col">
+      <h4>تواصل معنا</h4>
+      <div class="contact-row"><img class="icon-svg-sm" src="assets/mail-01.svg"> <a href="mailto:info@lumoraoassis.com">info@lumoraoassis.com</a></div>
+      <div class="contact-row"><img class="icon-svg-sm" src="assets/call.svg"> <a href="tel:0570305767">0570305767</a></div>
+      <p style="margin-top:14px;">تابعنا على</p>
+      <div class="social-row">
+        <span><img class="icon-svg" src="assets/instagram.svg"></span>
+        <span><img class="icon-svg" src="assets/linkedin-02.svg"></span>
+        <span><img class="icon-svg" src="assets/new-twitter.svg"></span>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">©2026 مجموعة تركي عمر</div>
+</footer>
+</body>
+</html>
