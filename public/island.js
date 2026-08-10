@@ -158,7 +158,7 @@ function buildPlaceholderIsland(THREE) {
   }
 
   const buildingAdImages = [
-    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=1080&h=1920&fit=crop&q=70',
+    'assets/PHOTO-2026-08-10-16-57-14.jpg',
     'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1080&h=1920&fit=crop&q=70',
     'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1080&h=1920&fit=crop&q=70',
     'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=1080&h=1920&fit=crop&q=70',
