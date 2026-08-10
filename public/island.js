@@ -7,6 +7,28 @@ function buildPlaceholderIsland(THREE) {
   const group = new THREE.Group();
   const textureLoader = new THREE.TextureLoader();
 
+  const BUILDING_IMAGE_ASPECT = 1080 / 1920;
+  const BILLBOARD_IMAGE_ASPECT = 1080 / 1080;
+  const SCREEN_MARGIN_RATIO = 0.92;
+  const SCREEN_THICKNESS = 0.05;
+  const SCREEN_GAP = 0.015;
+
+  // ---- إعدادات العدد ---- (غيّر الأرقام بس لو تبي تزيد/تنقص)
+  const BUILDING_COUNT = 25;
+  const BILLBOARD_COUNT = 33;
+
+  // مقاسات ثابتة (نفس مقاس المباني/اللوحات الأصلية الصغيرة)
+  const BUILDING_WIDTH = 0.6, BUILDING_DEPTH = 0.4;
+  const BUILDING_MIN_HEIGHT = 1.5, BUILDING_MAX_HEIGHT = 2.3;
+
+  const BOARD_WIDTH = 0.9, BOARD_HEIGHT = 0.6, BOARD_DEPTH = 0.08;
+  const POLE_HEIGHT = 0.5, POLE_X_OFFSET = BOARD_WIDTH * 0.32, POLE_RADIUS = 0.04;
+
+  // نطاق التوزيع العشوائي (نصف قطر من مركز الجزيرة)
+  const SCATTER_MIN_RADIUS = 1.0;
+  const SCATTER_MAX_RADIUS = 4.6;
+  const MIN_SPACING = 0.9; // أقل مسافة بين أي عنصرين عشان يقل التداخل
+
   const baseGeo = new THREE.BoxGeometry(10, 0.4, 10);
   const baseMat = new THREE.MeshStandardMaterial({
     color: 0x2a1a6e, emissive: 0x150a3d, roughness: 0.4, metalness: 0.3
@@ -29,80 +51,181 @@ function buildPlaceholderIsland(THREE) {
   edge.rotation.y = Math.PI / 4;
   group.add(edge);
 
-  // ماتيريال أساسي غامق لجوانب المبنى/اللوحة اللي ما فيها إعلان
   function bodyMat() {
     return new THREE.MeshStandardMaterial({
       color: 0x0a0818, emissive: 0x0f2540, emissiveIntensity: 0.4
     });
   }
 
-  // ماتيريال يحمّل صورة إعلان حقيقية (Texture) بدل اللون الفلات
-  function adFaceMat(imageUrl) {
+  function poleMat() {
+    return new THREE.MeshStandardMaterial({ color: 0x0d0d14, roughness: 0.6, metalness: 0.2 });
+  }
+
+  function adFaceMat(imageUrl, faceWidth, faceHeight, imageAspect) {
     const texture = textureLoader.load(imageUrl);
     texture.colorSpace = THREE.SRGBColorSpace || texture.colorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+
+    const faceAspect = faceWidth / faceHeight;
+    if (imageAspect > faceAspect) {
+      const repeatX = faceAspect / imageAspect;
+      texture.repeat.set(repeatX, 1);
+      texture.offset.set((1 - repeatX) / 2, 0);
+    } else {
+      const repeatY = imageAspect / faceAspect;
+      texture.repeat.set(1, repeatY);
+      texture.offset.set(0, (1 - repeatY) / 2);
+    }
+
     return new THREE.MeshStandardMaterial({
       map: texture, emissive: 0x111111, emissiveIntensity: 0.15, roughness: 0.55
     });
   }
 
-  // يبني صندوق (مبنى أو لوحة) بحيث الوجه الأمامي (+Z و -Z) يعرض صورة الإعلان،
-  // وباقي الأوجه تبقى غامقة عادية. ترتيب أوجه BoxGeometry: [+X,-X,+Y,-Y,+Z,-Z]
-  function createAdBox(width, height, depth, imageUrl) {
+  function createPlainBox(width, height, depth) {
+    return new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMat());
+  }
+
+  function createScreenBox(width, height, depth, imageUrl, imageAspect) {
     const geo = new THREE.BoxGeometry(width, height, depth);
     const side = bodyMat();
-    const front = adFaceMat(imageUrl);
+    const front = adFaceMat(imageUrl, width, height, imageAspect);
     const materials = [side, side, side, side, front, front];
     return new THREE.Mesh(geo, materials);
   }
 
-  // صور بوسترات طولية (Portrait) لواجهات المباني الطويلة
-  const buildingAdImages = [
-    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&h=800&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=800&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=800&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&h=800&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=800&fit=crop&q=70'
-  ];
-
-  // صور عرضية (Landscape) للوحات الموزعة على الحواف
-  const billboardAdImages = [
-    'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&h=450&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800&h=450&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=450&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1518444065439-e933c06ce9cd?w=800&h=450&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&h=450&fit=crop&q=70',
-    'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&h=450&fit=crop&q=70'
-  ];
-
-  let buildingIndex = 0;
-  for (let i = -2; i <= 2; i++) {
-    const h = 1.5 + Math.abs(i) * -0.4 + 2.2;
-    const imageUrl = buildingAdImages[buildingIndex % buildingAdImages.length];
-    buildingIndex++;
-    const b = createAdBox(0.8, h, 0.8, imageUrl);
-    b.position.set(i * 0.9, h / 2 + 0.2, -3.2);
-    group.add(b);
+  function fitScreenSize(maxWidth, maxHeight, imageAspect) {
+    const availW = maxWidth * SCREEN_MARGIN_RATIO;
+    const availH = maxHeight * SCREEN_MARGIN_RATIO;
+    let w = availW;
+    let h = w / imageAspect;
+    if (h > availH) {
+      h = availH;
+      w = h * imageAspect;
+    }
+    return { width: w, height: h };
   }
-  window.LUMORA_BILLBOARD_IMAGES = billboardAdImages;
-  // لوحات صغيرة على الحواف - تفاعلية للنقر، بصور عرضية
-  const boardPositions = [
-    [-3.6, -1.8], [-4.4, 0.4], [-3.2, 2.4],
-    [3.6, -1.8], [4.4, 0.4], [3.2, 2.4]
+
+  function attachEmbeddedScreens(parentMesh, parentWidth, parentHeight, parentDepth, imageUrl, imageAspect, clickableList, boardType, adIndex) {
+    const size = fitScreenSize(parentWidth, parentHeight, imageAspect);
+
+    const frontScreen = createScreenBox(size.width, size.height, SCREEN_THICKNESS, imageUrl, imageAspect);
+    frontScreen.position.set(0, 0, parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP);
+    frontScreen.userData.boardType = boardType;
+    frontScreen.userData.adIndex = adIndex;
+    parentMesh.add(frontScreen);
+    clickableList.push(frontScreen);
+
+    const backScreen = createScreenBox(size.width, size.height, SCREEN_THICKNESS, imageUrl, imageAspect);
+    backScreen.position.set(0, 0, -(parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP));
+    backScreen.rotation.y = Math.PI;
+    backScreen.userData.boardType = boardType;
+    backScreen.userData.adIndex = adIndex;
+    parentMesh.add(backScreen);
+    clickableList.push(backScreen);
+  }
+
+  // يبعثر "count" موقع عشوائي بمنطقة دائرية، ويحاول يبعد كل موقع عن الباقي
+  // (عن المباني واللوحات سوا) عشان يقل التداخل، بدون ترتيب صفوف أو أقواس
+  function scatterRandom(count, minRadius, maxRadius, minSpacing, occupied) {
+    const positions = [];
+    const maxAttempts = 40;
+    for (let i = 0; i < count; i++) {
+      let placed = null;
+      for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = minRadius + Math.random() * (maxRadius - minRadius);
+        const x = radius * Math.cos(angle);
+        const z = radius * Math.sin(angle);
+        let ok = true;
+        for (const p of occupied) {
+          const dx = p.x - x, dz = p.z - z;
+          if (Math.sqrt(dx * dx + dz * dz) < minSpacing) { ok = false; break; }
+        }
+        if (ok) placed = { x, z };
+      }
+      if (!placed) {
+        // ما لقى مكان فاضي كفاية بعد كل المحاولات، يحطه عشوائي بأي حال
+        const angle = Math.random() * Math.PI * 2;
+        const radius = minRadius + Math.random() * (maxRadius - minRadius);
+        placed = { x: radius * Math.cos(angle), z: radius * Math.sin(angle) };
+      }
+      occupied.push(placed);
+      positions.push(placed);
+    }
+    return positions;
+  }
+
+  const buildingAdImages = [
+    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=1080&h=1920&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1080&h=1920&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1080&h=1920&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=1080&h=1920&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1080&h=1920&fit=crop&q=70'
   ];
+
+  const billboardAdImages = [
+    'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=1080&h=1080&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=1080&h=1080&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1080&h=1080&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1518444065439-e933c06ce9cd?w=1080&h=1080&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1080&h=1080&fit=crop&q=70',
+    'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1080&h=1080&fit=crop&q=70'
+  ];
+
+  window.LUMORA_BUILDING_IMAGES = buildingAdImages;
+  window.LUMORA_BILLBOARD_IMAGES = billboardAdImages;
+
   group.userData.clickableBoards = [];
-  boardPositions.forEach((pos, idx) => {
+
+  // مواقع كل العناصر (مباني + لوحات) تتحسب سوا بنفس القائمة عشان
+  // ما يتلاصقون مع بعض حتى لو نوعهم مختلف
+  const occupiedPositions = [];
+
+  // ---- المباني: مقاس ثابت صغير، طول عشوائي، مواقع عشوائية ----
+  for (let i = 0; i < BUILDING_COUNT; i++) {
+    const pos = scatterRandom(1, SCATTER_MIN_RADIUS, SCATTER_MAX_RADIUS, MIN_SPACING, occupiedPositions)[0];
+    const h = BUILDING_MIN_HEIGHT + Math.random() * (BUILDING_MAX_HEIGHT - BUILDING_MIN_HEIGHT);
+    const imageUrl = buildingAdImages[i % buildingAdImages.length];
+
+    const buildingBody = createPlainBox(BUILDING_WIDTH, h, BUILDING_DEPTH);
+    buildingBody.position.set(pos.x, h / 2 + 0.2, pos.z);
+    buildingBody.lookAt(0, h / 2 + 0.2, 0);
+    group.add(buildingBody);
+
+    attachEmbeddedScreens(
+      buildingBody, BUILDING_WIDTH, h, BUILDING_DEPTH,
+      imageUrl, BUILDING_IMAGE_ASPECT,
+      group.userData.clickableBoards, 'building', i % buildingAdImages.length
+    );
+  }
+
+  // ---- اللوحات: مقاس ثابت صغير، مواقع عشوائية، كل وحدة على عمودين ----
+  for (let idx = 0; idx < BILLBOARD_COUNT; idx++) {
+    const pos = scatterRandom(1, SCATTER_MIN_RADIUS, SCATTER_MAX_RADIUS, MIN_SPACING, occupiedPositions)[0];
+    const frameCenterY = POLE_HEIGHT + BOARD_HEIGHT / 2;
     const imageUrl = billboardAdImages[idx % billboardAdImages.length];
-    const board = createAdBox(0.9, 0.6, 0.08, imageUrl);
-    board.position.set(pos[0], 0.9, pos[1]);
-    board.lookAt(0, 0.9, 0);
-    board.userData.adIndex = idx;
-    const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8);
-    const pole = new THREE.Mesh(poleGeo, new THREE.MeshStandardMaterial({ color: 0x111111 }));
-    pole.position.set(pos[0], 0.3, pos[1]);
-    group.add(board);
-    group.add(pole);
-    group.userData.clickableBoards.push(board);
-  });
+
+    const boardFrame = createPlainBox(BOARD_WIDTH, BOARD_HEIGHT, BOARD_DEPTH);
+    boardFrame.position.set(pos.x, frameCenterY, pos.z);
+    boardFrame.lookAt(0, frameCenterY, 0);
+    group.add(boardFrame);
+
+    attachEmbeddedScreens(
+      boardFrame, BOARD_WIDTH, BOARD_HEIGHT, BOARD_DEPTH,
+      imageUrl, BILLBOARD_IMAGE_ASPECT,
+      group.userData.clickableBoards, 'billboard', idx % billboardAdImages.length
+    );
+
+    const poleLocalY = -(BOARD_HEIGHT / 2 + POLE_HEIGHT / 2);
+    [-POLE_X_OFFSET, POLE_X_OFFSET].forEach((xOffset) => {
+      const poleGeo = new THREE.CylinderGeometry(POLE_RADIUS, POLE_RADIUS * 1.15, POLE_HEIGHT, 8);
+      const pole = new THREE.Mesh(poleGeo, poleMat());
+      pole.position.set(xOffset, poleLocalY, 0);
+      boardFrame.add(pole);
+    });
+  }
 
   return group;
 }
@@ -226,7 +349,6 @@ function initIslandViewer(containerId, options) {
     if (hint) hint.style.opacity = '0';
   }, { passive: false });
 
-  // النقر على لوحة إعلانية يودّي لصفحة التفاصيل (لو معرّفة)
   if (options.onBoardClick || options.onEmptyClick) {
     renderer.domElement.style.cursor = 'grab';
     renderer.domElement.addEventListener('pointerup', (e) => {
@@ -241,7 +363,8 @@ function initIslandViewer(containerId, options) {
       const hits = raycaster.intersectObjects(island.userData.clickableBoards || []);
       if (hits.length > 0) {
         const idx = hits[0].object.userData.adIndex;
-        options.onBoardClick && options.onBoardClick(idx);
+        const type = hits[0].object.userData.boardType;
+        options.onBoardClick && options.onBoardClick(idx, type);
       } else {
         options.onEmptyClick && options.onEmptyClick();
       }
