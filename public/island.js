@@ -1,5 +1,8 @@
 /* ============================================================
    عارض الجزيرة 3D المشترك - واحة لومورا
+   كل نقطة إعلان دبوس بقرص أسطواني (له سماكة) يطلع مباشرة من سطح
+   أرضية الجزيرة، بنفس تصميم نسخة المعلن. الأشكال والخامات لكل
+   صورة تُبنى مرة وحدة بس وتُعاد استخدامها (أداء أفضل مع أعداد كبيرة)
    يُستدعى بـ initIslandViewer('containerId', { small: true/false })
    ============================================================ */
 
@@ -9,28 +12,22 @@ function buildPlaceholderIsland(THREE) {
 
   const BUILDING_IMAGE_ASPECT = 1080 / 1920;
   const BILLBOARD_IMAGE_ASPECT = 1080 / 1080;
-  const SCREEN_MARGIN_RATIO = 0.92;
-  const SCREEN_THICKNESS = 0.05;
-  const SCREEN_GAP = 0.015;
 
-  // ---- إعدادات العدد ---- (غيّر الأرقام بس لو تبي تزيد/تنقص)
-  const BUILDING_COUNT = 25;
-  const BILLBOARD_COUNT = 33;
+  // ---- إعدادات العدد ---- (غيّر الأرقام بس لو تبي تزيد/تنقص أكثر)
+  const BUILDING_COUNT = 75;
+  const BILLBOARD_COUNT = 75;
 
-  const BUILDING_WIDTH = 0.6, BUILDING_DEPTH = 0.4;
-  const BUILDING_MIN_HEIGHT = 1.5, BUILDING_MAX_HEIGHT = 2.3;
-  const BUILDING_SCREEN_LIFT = 0.7; // 0 = تتوسط بالمبنى، 1 = تلتصق بأعلاه تمامًا
+  const PIN_DIAMETER = 0.55;
+  const PIN_THICKNESS = 0.08;
+  const PIN_TAIL_HEIGHT = 0.16;
+  const PIN_TAIL_WIDTH_RATIO = 0.26;
+  const PIN_SEGMENTS = 28;
 
-  // اللوحات صارت مربّعة (بدل مستطيلة عريضة) عشان تناسب الصورة المربعة
-  // وتطلع بإطار رفيع موحّد حوالين الشاشة، مو صندوق عريض فاضي من الجنبين
-  const BOARD_WIDTH = 0.62, BOARD_HEIGHT = 0.62, BOARD_DEPTH = 0.08;
-  const POLE_HEIGHT = 0.5, POLE_X_OFFSET = BOARD_WIDTH * 0.32, POLE_RADIUS = 0.04;
-  const BILLBOARD_SCREEN_LIFT = 0; // تفضل متوسطة، ما تحتاج رفع
+  const GROUND_Y = 0.2;
 
-  // نطاق التوزيع العشوائي (نصف قطر من مركز الجزيرة)
-  const SCATTER_MIN_RADIUS = 1.0;
-  const SCATTER_MAX_RADIUS = 4.6;
-  const MIN_SPACING = 0.9;
+  const SCATTER_MIN_RADIUS = 0.9;
+  const SCATTER_MAX_RADIUS = 4.8;
+  const MIN_SPACING = 0.65;
 
   const baseGeo = new THREE.BoxGeometry(10, 0.4, 10);
   const baseMat = new THREE.MeshStandardMaterial({
@@ -54,16 +51,6 @@ function buildPlaceholderIsland(THREE) {
   edge.rotation.y = Math.PI / 4;
   group.add(edge);
 
-  function bodyMat() {
-    return new THREE.MeshStandardMaterial({
-      color: 0x0a0818, emissive: 0x0f2540, emissiveIntensity: 0.4
-    });
-  }
-
-  function poleMat() {
-    return new THREE.MeshStandardMaterial({ color: 0x0d0d14, roughness: 0.6, metalness: 0.2 });
-  }
-
   function adFaceMat(imageUrl, faceWidth, faceHeight, imageAspect) {
     const texture = textureLoader.load(imageUrl);
     texture.colorSpace = THREE.SRGBColorSpace || texture.colorSpace;
@@ -82,86 +69,33 @@ function buildPlaceholderIsland(THREE) {
     }
 
     return new THREE.MeshStandardMaterial({
-      map: texture, emissive: 0x111111, emissiveIntensity: 0.15, roughness: 0.55
+      map: texture, emissive: 0x111111, emissiveIntensity: 0.1, roughness: 0.5
     });
   }
 
-  function createPlainBox(width, height, depth) {
-    return new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMat());
+  function createTailGeometry(width, height) {
+    const geo = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      -width / 2, height, 0,
+       width / 2, height, 0,
+       0, 0, 0
+    ]);
+    geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geo.computeVertexNormals();
+    return geo;
   }
 
-  function createScreenBox(width, height, depth, imageUrl, imageAspect) {
-    const geo = new THREE.BoxGeometry(width, height, depth);
-    const side = bodyMat();
-    const front = adFaceMat(imageUrl, width, height, imageAspect);
-    const materials = [side, side, side, side, front, front];
-    return new THREE.Mesh(geo, materials);
-  }
+  // ------------------------------------------------------------
+  // الموارد المشتركة: تُبنى مرة وحدة بس لكل صورة، وتُعاد استخدامها
+  // ------------------------------------------------------------
+  const radius = PIN_DIAMETER / 2;
+  const discCenterY = PIN_TAIL_HEIGHT + radius;
 
-  function fitScreenSize(maxWidth, maxHeight, imageAspect) {
-    const availW = maxWidth * SCREEN_MARGIN_RATIO;
-    const availH = maxHeight * SCREEN_MARGIN_RATIO;
-    let w = availW;
-    let h = w / imageAspect;
-    if (h > availH) {
-      h = availH;
-      w = h * imageAspect;
-    }
-    return { width: w, height: h };
-  }
-
-  // liftFraction: 0 = الشاشة تتوسط بالجسم، 1 = تلتصق بأعلى الجسم تمامًا
-  // (يحسب المسافة الفاضية فوق/تحت الشاشة أول، ويرفعها جوّه هالمسافة بس،
-  // فما تطلع أبدًا خارج حدود المبنى مهما كانت النسبة)
-  function attachEmbeddedScreens(parentMesh, parentWidth, parentHeight, parentDepth, imageUrl, imageAspect, clickableList, boardType, adIndex, liftFraction) {
-    liftFraction = liftFraction || 0;
-    const size = fitScreenSize(parentWidth, parentHeight, imageAspect);
-    const freeSpace = (parentHeight - size.height) / 2;
-    const verticalOffset = freeSpace * liftFraction;
-
-    const frontScreen = createScreenBox(size.width, size.height, SCREEN_THICKNESS, imageUrl, imageAspect);
-    frontScreen.position.set(0, verticalOffset, parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP);
-    frontScreen.userData.boardType = boardType;
-    frontScreen.userData.adIndex = adIndex;
-    parentMesh.add(frontScreen);
-    clickableList.push(frontScreen);
-
-    const backScreen = createScreenBox(size.width, size.height, SCREEN_THICKNESS, imageUrl, imageAspect);
-    backScreen.position.set(0, verticalOffset, -(parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP));
-    backScreen.rotation.y = Math.PI;
-    backScreen.userData.boardType = boardType;
-    backScreen.userData.adIndex = adIndex;
-    parentMesh.add(backScreen);
-    clickableList.push(backScreen);
-  }
-
-  function scatterRandom(count, minRadius, maxRadius, minSpacing, occupied) {
-    const positions = [];
-    const maxAttempts = 40;
-    for (let i = 0; i < count; i++) {
-      let placed = null;
-      for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = minRadius + Math.random() * (maxRadius - minRadius);
-        const x = radius * Math.cos(angle);
-        const z = radius * Math.sin(angle);
-        let ok = true;
-        for (const p of occupied) {
-          const dx = p.x - x, dz = p.z - z;
-          if (Math.sqrt(dx * dx + dz * dz) < minSpacing) { ok = false; break; }
-        }
-        if (ok) placed = { x, z };
-      }
-      if (!placed) {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = minRadius + Math.random() * (maxRadius - minRadius);
-        placed = { x: radius * Math.cos(angle), z: radius * Math.sin(angle) };
-      }
-      occupied.push(placed);
-      positions.push(placed);
-    }
-    return positions;
-  }
+  const sharedBodyMat = new THREE.MeshStandardMaterial({
+    color: 0xf2f3fb, emissive: 0x24244a, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.1
+  });
+  
+  const sharedTailGeo = createTailGeometry(PIN_DIAMETER * PIN_TAIL_WIDTH_RATIO, PIN_TAIL_HEIGHT);
 
   const buildingAdImages = [
     'assets/PHOTO-2026-08-10-16-57-14.jpg',
@@ -183,53 +117,81 @@ function buildPlaceholderIsland(THREE) {
   window.LUMORA_BUILDING_IMAGES = buildingAdImages;
   window.LUMORA_BILLBOARD_IMAGES = billboardAdImages;
 
+  // خامة صورة لكل عنصر بالمصفوفة تُبنى مرة وحدة بس (مو خامة جديدة بكل دبوس)
+  const sharedBuildingPhotoMats = buildingAdImages.map(url =>
+    adFaceMat(url, PIN_DIAMETER, PIN_DIAMETER, BUILDING_IMAGE_ASPECT)
+  );
+  const sharedBillboardPhotoMats = billboardAdImages.map(url =>
+    adFaceMat(url, PIN_DIAMETER, PIN_DIAMETER, BILLBOARD_IMAGE_ASPECT)
+  );
+
+ function createPin(photoMat, boardType, adIndex, clickableList) {
+    const pinGroup = new THREE.Group();
+
+    const cardGeo = new THREE.BoxGeometry(PIN_DIAMETER, PIN_DIAMETER, PIN_THICKNESS);
+    const card = new THREE.Mesh(cardGeo, [
+      sharedBodyMat, sharedBodyMat, sharedBodyMat, sharedBodyMat, photoMat, photoMat
+    ]);
+    card.position.set(0, discCenterY, 0);
+    card.userData.boardType = boardType;
+    card.userData.adIndex = adIndex;
+    pinGroup.add(card);
+    clickableList.push(card);
+
+    const tail = new THREE.Mesh(sharedTailGeo, sharedBodyMat);
+    tail.position.set(0, 0, 0);
+    pinGroup.add(tail);
+
+    return pinGroup;
+  }
+
+  function scatterRandom(count, minRadius, maxRadius, minSpacing, occupied) {
+    const positions = [];
+    const maxAttempts = 40;
+    for (let i = 0; i < count; i++) {
+      let placed = null;
+      for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = minRadius + Math.random() * (maxRadius - minRadius);
+        const x = r * Math.cos(angle);
+        const z = r * Math.sin(angle);
+        let ok = true;
+        for (const p of occupied) {
+          const dx = p.x - x, dz = p.z - z;
+          if (Math.sqrt(dx * dx + dz * dz) < minSpacing) { ok = false; break; }
+        }
+        if (ok) placed = { x, z };
+      }
+      if (!placed) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = minRadius + Math.random() * (maxRadius - minRadius);
+        placed = { x: r * Math.cos(angle), z: r * Math.sin(angle) };
+      }
+      occupied.push(placed);
+      positions.push(placed);
+    }
+    return positions;
+  }
+
   group.userData.clickableBoards = [];
   const occupiedPositions = [];
 
-  // ---- المباني: شاشتها ترتفع لفوق (BUILDING_SCREEN_LIFT) بدل التوسط ----
   for (let i = 0; i < BUILDING_COUNT; i++) {
     const pos = scatterRandom(1, SCATTER_MIN_RADIUS, SCATTER_MAX_RADIUS, MIN_SPACING, occupiedPositions)[0];
-    const h = BUILDING_MIN_HEIGHT + Math.random() * (BUILDING_MAX_HEIGHT - BUILDING_MIN_HEIGHT);
-    const imageUrl = buildingAdImages[i % buildingAdImages.length];
-
-    const buildingBody = createPlainBox(BUILDING_WIDTH, h, BUILDING_DEPTH);
-    buildingBody.position.set(pos.x, h / 2 + 0.2, pos.z);
-    buildingBody.lookAt(0, h / 2 + 0.2, 0);
-    group.add(buildingBody);
-
-    attachEmbeddedScreens(
-      buildingBody, BUILDING_WIDTH, h, BUILDING_DEPTH,
-      imageUrl, BUILDING_IMAGE_ASPECT,
-      group.userData.clickableBoards, 'building', i % buildingAdImages.length,
-      BUILDING_SCREEN_LIFT
-    );
+    const imgIndex = i % buildingAdImages.length;
+    const pin = createPin(sharedBuildingPhotoMats[imgIndex], 'building', imgIndex, group.userData.clickableBoards);
+    pin.position.set(pos.x, GROUND_Y, pos.z);
+    pin.lookAt(0, GROUND_Y, 0);
+    group.add(pin);
   }
 
-  // ---- اللوحات: إطار مربّع رفيع حوالين الشاشة، بعمودين ----
   for (let idx = 0; idx < BILLBOARD_COUNT; idx++) {
     const pos = scatterRandom(1, SCATTER_MIN_RADIUS, SCATTER_MAX_RADIUS, MIN_SPACING, occupiedPositions)[0];
-    const frameCenterY = POLE_HEIGHT + BOARD_HEIGHT / 2;
-    const imageUrl = billboardAdImages[idx % billboardAdImages.length];
-
-    const boardFrame = createPlainBox(BOARD_WIDTH, BOARD_HEIGHT, BOARD_DEPTH);
-    boardFrame.position.set(pos.x, frameCenterY, pos.z);
-    boardFrame.lookAt(0, frameCenterY, 0);
-    group.add(boardFrame);
-
-    attachEmbeddedScreens(
-      boardFrame, BOARD_WIDTH, BOARD_HEIGHT, BOARD_DEPTH,
-      imageUrl, BILLBOARD_IMAGE_ASPECT,
-      group.userData.clickableBoards, 'billboard', idx % billboardAdImages.length,
-      BILLBOARD_SCREEN_LIFT
-    );
-
-    const poleLocalY = -(BOARD_HEIGHT / 2 + POLE_HEIGHT / 2);
-    [-POLE_X_OFFSET, POLE_X_OFFSET].forEach((xOffset) => {
-      const poleGeo = new THREE.CylinderGeometry(POLE_RADIUS, POLE_RADIUS * 1.15, POLE_HEIGHT, 8);
-      const pole = new THREE.Mesh(poleGeo, poleMat());
-      pole.position.set(xOffset, poleLocalY, 0);
-      boardFrame.add(pole);
-    });
+    const imgIndex = idx % billboardAdImages.length;
+    const pin = createPin(sharedBillboardPhotoMats[imgIndex], 'billboard', imgIndex, group.userData.clickableBoards);
+    pin.position.set(pos.x, GROUND_Y, pos.z);
+    pin.lookAt(0, GROUND_Y, 0);
+    group.add(pin);
   }
 
   return group;
