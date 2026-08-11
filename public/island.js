@@ -17,17 +17,20 @@ function buildPlaceholderIsland(THREE) {
   const BUILDING_COUNT = 25;
   const BILLBOARD_COUNT = 33;
 
-  // مقاسات ثابتة (نفس مقاس المباني/اللوحات الأصلية الصغيرة)
   const BUILDING_WIDTH = 0.6, BUILDING_DEPTH = 0.4;
   const BUILDING_MIN_HEIGHT = 1.5, BUILDING_MAX_HEIGHT = 2.3;
+  const BUILDING_SCREEN_LIFT = 0.7; // 0 = تتوسط بالمبنى، 1 = تلتصق بأعلاه تمامًا
 
-  const BOARD_WIDTH = 0.9, BOARD_HEIGHT = 0.6, BOARD_DEPTH = 0.08;
+  // اللوحات صارت مربّعة (بدل مستطيلة عريضة) عشان تناسب الصورة المربعة
+  // وتطلع بإطار رفيع موحّد حوالين الشاشة، مو صندوق عريض فاضي من الجنبين
+  const BOARD_WIDTH = 0.62, BOARD_HEIGHT = 0.62, BOARD_DEPTH = 0.08;
   const POLE_HEIGHT = 0.5, POLE_X_OFFSET = BOARD_WIDTH * 0.32, POLE_RADIUS = 0.04;
+  const BILLBOARD_SCREEN_LIFT = 0; // تفضل متوسطة، ما تحتاج رفع
 
   // نطاق التوزيع العشوائي (نصف قطر من مركز الجزيرة)
   const SCATTER_MIN_RADIUS = 1.0;
   const SCATTER_MAX_RADIUS = 4.6;
-  const MIN_SPACING = 0.9; // أقل مسافة بين أي عنصرين عشان يقل التداخل
+  const MIN_SPACING = 0.9;
 
   const baseGeo = new THREE.BoxGeometry(10, 0.4, 10);
   const baseMat = new THREE.MeshStandardMaterial({
@@ -107,18 +110,24 @@ function buildPlaceholderIsland(THREE) {
     return { width: w, height: h };
   }
 
-  function attachEmbeddedScreens(parentMesh, parentWidth, parentHeight, parentDepth, imageUrl, imageAspect, clickableList, boardType, adIndex) {
+  // liftFraction: 0 = الشاشة تتوسط بالجسم، 1 = تلتصق بأعلى الجسم تمامًا
+  // (يحسب المسافة الفاضية فوق/تحت الشاشة أول، ويرفعها جوّه هالمسافة بس،
+  // فما تطلع أبدًا خارج حدود المبنى مهما كانت النسبة)
+  function attachEmbeddedScreens(parentMesh, parentWidth, parentHeight, parentDepth, imageUrl, imageAspect, clickableList, boardType, adIndex, liftFraction) {
+    liftFraction = liftFraction || 0;
     const size = fitScreenSize(parentWidth, parentHeight, imageAspect);
+    const freeSpace = (parentHeight - size.height) / 2;
+    const verticalOffset = freeSpace * liftFraction;
 
     const frontScreen = createScreenBox(size.width, size.height, SCREEN_THICKNESS, imageUrl, imageAspect);
-    frontScreen.position.set(0, 0, parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP);
+    frontScreen.position.set(0, verticalOffset, parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP);
     frontScreen.userData.boardType = boardType;
     frontScreen.userData.adIndex = adIndex;
     parentMesh.add(frontScreen);
     clickableList.push(frontScreen);
 
     const backScreen = createScreenBox(size.width, size.height, SCREEN_THICKNESS, imageUrl, imageAspect);
-    backScreen.position.set(0, 0, -(parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP));
+    backScreen.position.set(0, verticalOffset, -(parentDepth / 2 + SCREEN_THICKNESS / 2 + SCREEN_GAP));
     backScreen.rotation.y = Math.PI;
     backScreen.userData.boardType = boardType;
     backScreen.userData.adIndex = adIndex;
@@ -126,8 +135,6 @@ function buildPlaceholderIsland(THREE) {
     clickableList.push(backScreen);
   }
 
-  // يبعثر "count" موقع عشوائي بمنطقة دائرية، ويحاول يبعد كل موقع عن الباقي
-  // (عن المباني واللوحات سوا) عشان يقل التداخل، بدون ترتيب صفوف أو أقواس
   function scatterRandom(count, minRadius, maxRadius, minSpacing, occupied) {
     const positions = [];
     const maxAttempts = 40;
@@ -146,7 +153,6 @@ function buildPlaceholderIsland(THREE) {
         if (ok) placed = { x, z };
       }
       if (!placed) {
-        // ما لقى مكان فاضي كفاية بعد كل المحاولات، يحطه عشوائي بأي حال
         const angle = Math.random() * Math.PI * 2;
         const radius = minRadius + Math.random() * (maxRadius - minRadius);
         placed = { x: radius * Math.cos(angle), z: radius * Math.sin(angle) };
@@ -178,12 +184,9 @@ function buildPlaceholderIsland(THREE) {
   window.LUMORA_BILLBOARD_IMAGES = billboardAdImages;
 
   group.userData.clickableBoards = [];
-
-  // مواقع كل العناصر (مباني + لوحات) تتحسب سوا بنفس القائمة عشان
-  // ما يتلاصقون مع بعض حتى لو نوعهم مختلف
   const occupiedPositions = [];
 
-  // ---- المباني: مقاس ثابت صغير، طول عشوائي، مواقع عشوائية ----
+  // ---- المباني: شاشتها ترتفع لفوق (BUILDING_SCREEN_LIFT) بدل التوسط ----
   for (let i = 0; i < BUILDING_COUNT; i++) {
     const pos = scatterRandom(1, SCATTER_MIN_RADIUS, SCATTER_MAX_RADIUS, MIN_SPACING, occupiedPositions)[0];
     const h = BUILDING_MIN_HEIGHT + Math.random() * (BUILDING_MAX_HEIGHT - BUILDING_MIN_HEIGHT);
@@ -197,11 +200,12 @@ function buildPlaceholderIsland(THREE) {
     attachEmbeddedScreens(
       buildingBody, BUILDING_WIDTH, h, BUILDING_DEPTH,
       imageUrl, BUILDING_IMAGE_ASPECT,
-      group.userData.clickableBoards, 'building', i % buildingAdImages.length
+      group.userData.clickableBoards, 'building', i % buildingAdImages.length,
+      BUILDING_SCREEN_LIFT
     );
   }
 
-  // ---- اللوحات: مقاس ثابت صغير، مواقع عشوائية، كل وحدة على عمودين ----
+  // ---- اللوحات: إطار مربّع رفيع حوالين الشاشة، بعمودين ----
   for (let idx = 0; idx < BILLBOARD_COUNT; idx++) {
     const pos = scatterRandom(1, SCATTER_MIN_RADIUS, SCATTER_MAX_RADIUS, MIN_SPACING, occupiedPositions)[0];
     const frameCenterY = POLE_HEIGHT + BOARD_HEIGHT / 2;
@@ -215,7 +219,8 @@ function buildPlaceholderIsland(THREE) {
     attachEmbeddedScreens(
       boardFrame, BOARD_WIDTH, BOARD_HEIGHT, BOARD_DEPTH,
       imageUrl, BILLBOARD_IMAGE_ASPECT,
-      group.userData.clickableBoards, 'billboard', idx % billboardAdImages.length
+      group.userData.clickableBoards, 'billboard', idx % billboardAdImages.length,
+      BILLBOARD_SCREEN_LIFT
     );
 
     const poleLocalY = -(BOARD_HEIGHT / 2 + POLE_HEIGHT / 2);
