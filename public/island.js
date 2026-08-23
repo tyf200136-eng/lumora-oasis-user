@@ -17,11 +17,13 @@ function buildPlaceholderIsland(THREE) {
   const SCREEN_GAP = 0.015;
 
   // ---- إعدادات العدد ----
-  const BUILDING_COUNT = 15;
+  const BUILDING_COUNT = 30;
+  const PIN_COUNT = 400; // بدل ما تعبّي كل مربع فاضي، ناخذ عيّنة عشوائية موزّعة منها
 
   // ---- ارتفاع المباني: رُفعت عشان تبين كأبراج واضحة وسط الدبابيس
   // القصيرة (نسبة طول:عرض أوضح، مو شكل مكعّب) ----
-  const BUILDING_MIN_HEIGHT = 3.0;
+  // ارتفاع اسمي بس لحساب نسبة القصّ الأولي لصور الشاشات (الارتفاع
+  // الفعلي لكل مبنى يُحسب لاحقًا هرميًا حسب قربه من المركز)
   const BUILDING_MAX_HEIGHT = 5.5;
   const BUILDING_SCREEN_LIFT = 0.7;
 
@@ -287,19 +289,21 @@ function buildPlaceholderIsland(THREE) {
     if (pos) buildingPositions.push(pos);
   }
 
-  // ---- المباني الأربعة بالنص بالضبط (أول 4 عناصر — الأقرب لمركز
-  // الجزيرة فعليًا لأن buildingPositions مرتبة من الأقرب للأبعد) تاخذ
-  // ارتفاع "معلم بارز" أطول من باقي المباني، عشان تبين كقمة وسط
-  // التجمّع ----
-  const CENTER_LANDMARK_COUNT = 4;
-  const LANDMARK_MIN_HEIGHT = 7.5;
-  const LANDMARK_MAX_HEIGHT = 9.5;
+  // ---- ارتفاع المباني: هرمي متدرّج حسب القرب من المركز (مو عشوائي
+  // بحت) — أطول مبنى دايمًا بالنص بالضبط، وكل ما ابتعدنا يقل الارتفاع
+  // تدريجيًا. هذا يمنع أي مبنى قصير قدّام مبنى طويل يحجبه، لأن كل حلقة
+  // أبعد عن المركز أقصر بشكل مضمون من الحلقة اللي قبلها (مع جيتر بسيط
+  // جدًا للتنويع بدون ما يكسر الترتيب) ----
+  const PEAK_HEIGHT = 9.5;   // أطول مبنى بالنص بالضبط
+  const BASE_HEIGHT = 3.0;   // أقصر مبنى بحافة التجمّع
+  const HEIGHT_GAMMA = 1.8;  // >1 يعطي قمة حادة بالنص وانحدار أهدأ للأطراف
+  const HEIGHT_JITTER = 0.15; // تنويع بسيط جدًا، ما يكسر الترتيب الهرمي
 
   buildingPositions.forEach((pos, i) => {
-    const isCenterLandmark = i < CENTER_LANDMARK_COUNT;
-    const h = isCenterLandmark
-      ? LANDMARK_MIN_HEIGHT + Math.random() * (LANDMARK_MAX_HEIGHT - LANDMARK_MIN_HEIGHT)
-      : BUILDING_MIN_HEIGHT + Math.random() * (BUILDING_MAX_HEIGHT - BUILDING_MIN_HEIGHT);
+    const t = buildingPositions.length > 1 ? i / (buildingPositions.length - 1) : 0;
+    const baseH = BASE_HEIGHT + (PEAK_HEIGHT - BASE_HEIGHT) * Math.pow(1 - t, HEIGHT_GAMMA);
+    const jitter = (Math.random() - 0.5) * 2 * HEIGHT_JITTER;
+    const h = Math.max(BASE_HEIGHT * 0.9, baseH + jitter);
     const imgIndex = i % buildingMats.length;
     const photoMat = buildingMats[imgIndex];
 
@@ -316,16 +320,20 @@ function buildPlaceholderIsland(THREE) {
     );
   });
 
-  // ---- 2) الدبابيس: كل مربع فاضي متبقي بالشبكة ياخذ دبوس واحد ----
-  const pinPositions = [];
+  // ---- 2) الدبابيس: عيّنة عشوائية موزّعة من المربعات الفاضية (مو
+  // بالضرورة كل مربع)، عشان يطلع فيه فراغات طبيعية بين الدبابيس ----
+  const freeCells = [];
   for (let i = 0; i < PLACEMENT_DIVISIONS; i++) {
     for (let j = 0; j < PLACEMENT_DIVISIONS; j++) {
-      if (!grid[i][j].occupied) {
-        pinPositions.push({ x: grid[i][j].x, z: grid[i][j].z });
-        grid[i][j].occupied = true;
-      }
+      if (!grid[i][j].occupied) freeCells.push({ x: grid[i][j].x, z: grid[i][j].z });
     }
   }
+  // خلط عشوائي (Fisher-Yates) ثم أخذ العدد المطلوب بس
+  for (let i = freeCells.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [freeCells[i], freeCells[j]] = [freeCells[j], freeCells[i]];
+  }
+  const pinPositions = freeCells.slice(0, Math.min(PIN_COUNT, freeCells.length));
 
   pinPositions.forEach((pos, i) => {
     const imgIndex = i % pinMats.length;
@@ -381,16 +389,21 @@ function initIslandViewer(containerId, options) {
   renderer.setSize(container.clientWidth, container.clientHeight);
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0x3a2a55, 1.2));
-  const keyLight = new THREE.DirectionalLight(0x9fd8ff, 0.6);
-  keyLight.position.set(8, 12, 6);
+  scene.add(new THREE.AmbientLight(0x30303a, 1.0));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  keyLight.position.set(12, 20, 10);
   scene.add(keyLight);
-  const pinkPoint = new THREE.PointLight(0xff3fa4, 3, 30);
-  pinkPoint.position.set(-6, 3, 6);
-  scene.add(pinkPoint);
-  const bluePoint = new THREE.PointLight(0x3fd0ff, 3, 30);
-  bluePoint.position.set(6, 3, -6);
-  scene.add(bluePoint);
+  const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
+  fillLight.position.set(-10, 14, -8);
+  scene.add(fillLight);
+  // نفس مكان اللمبتين الأصليتين (اللي كانت وردي/أزرق)، بس بلون أبيض
+  // محايد عشان تضيء جوانب المباني القريبة بدون ما تلوّن البوسترات
+  const whitePointA = new THREE.PointLight(0xffffff, 2.5, 40);
+  whitePointA.position.set(-8, 8, 8);
+  scene.add(whitePointA);
+  const whitePointB = new THREE.PointLight(0xffffff, 2.5, 40);
+  whitePointB.position.set(8, 8, -8);
+  scene.add(whitePointB);
 
   const island = buildPlaceholderIsland(THREE);
   scene.add(island);
