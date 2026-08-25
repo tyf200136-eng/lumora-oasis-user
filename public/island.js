@@ -389,11 +389,11 @@ function initIslandViewer(containerId, options) {
   renderer.setSize(container.clientWidth, container.clientHeight);
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0x30303a, 1.0));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  scene.add(new THREE.AmbientLight(0x35353f, 1.35));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
   keyLight.position.set(12, 20, 10);
   scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
+  const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
   fillLight.position.set(-10, 14, -8);
   scene.add(fillLight);
   // نفس مكان اللمبتين الأصليتين (اللي كانت وردي/أزرق)، بس بلون أبيض
