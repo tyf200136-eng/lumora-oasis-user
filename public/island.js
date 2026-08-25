@@ -389,19 +389,23 @@ function initIslandViewer(containerId, options) {
   renderer.setSize(container.clientWidth, container.clientHeight);
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0x35353f, 1.35));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  // مضاعف سطوع عام لكل إضاءة المشهد — قلّله لو تبي المشهد أخفت،
+  // زوّده لو تبي أسطع، بدون ما تروح لكل لمبة لحالها
+  const BRIGHTNESS = 0.7;
+
+  scene.add(new THREE.AmbientLight(0x35353f, 1.35 * BRIGHTNESS));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85 * BRIGHTNESS);
   keyLight.position.set(12, 20, 10);
   scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  const fillLight = new THREE.DirectionalLight(0xffffff, 0.6 * BRIGHTNESS);
   fillLight.position.set(-10, 14, -8);
   scene.add(fillLight);
   // نفس مكان اللمبتين الأصليتين (اللي كانت وردي/أزرق)، بس بلون أبيض
   // محايد عشان تضيء جوانب المباني القريبة بدون ما تلوّن البوسترات
-  const whitePointA = new THREE.PointLight(0xffffff, 2.5, 40);
+  const whitePointA = new THREE.PointLight(0xffffff, 2.5 * BRIGHTNESS, 40);
   whitePointA.position.set(-8, 8, 8);
   scene.add(whitePointA);
-  const whitePointB = new THREE.PointLight(0xffffff, 2.5, 40);
+  const whitePointB = new THREE.PointLight(0xffffff, 2.5 * BRIGHTNESS, 40);
   whitePointB.position.set(8, 8, -8);
   scene.add(whitePointB);
 
@@ -417,7 +421,7 @@ function initIslandViewer(containerId, options) {
     [-CORNER_LIGHT_DISTANCE, CORNER_LIGHT_HEIGHT, 0]
   ];
   cornerPositions.forEach(([x, y, z]) => {
-    const cornerLight = new THREE.PointLight(0xffffff, 2.4, 26);
+    const cornerLight = new THREE.PointLight(0xffffff, 2.4 * BRIGHTNESS, 26);
     cornerLight.position.set(x, y, z);
     scene.add(cornerLight);
   });
@@ -435,7 +439,7 @@ function initIslandViewer(containerId, options) {
     [-OUTER_CORNER_LIGHT_DISTANCE, OUTER_CORNER_LIGHT_HEIGHT, 0]
   ];
   outerCornerPositions.forEach(([x, y, z]) => {
-    const outerCornerLight = new THREE.PointLight(0xffffff, 1.8, 18);
+    const outerCornerLight = new THREE.PointLight(0xffffff, 1.8 * BRIGHTNESS, 18);
     outerCornerLight.position.set(x, y, z);
     scene.add(outerCornerLight);
   });
