@@ -405,6 +405,41 @@ function initIslandViewer(containerId, options) {
   whitePointB.position.set(8, 8, -8);
   scene.add(whitePointB);
 
+  // ---- إضاءة الزوايا الأربع (الجزيرة شكلها ماسة، فأطراف الحلقة عند
+  // الزوايا هي الأبعد عن أي ضوء ثاني) — 4 لمبات بيضاء خفيفة توزّع
+  // الإضاءة من كل الاتجاهات، مو بس اتجاهين ----
+  const CORNER_LIGHT_DISTANCE = 11; // أقرب شوي من طرف الماسة الفعلي (~14.1) عشان تغطي حلقة الدبابيس
+  const CORNER_LIGHT_HEIGHT = 5;
+  const cornerPositions = [
+    [0, CORNER_LIGHT_HEIGHT, CORNER_LIGHT_DISTANCE],
+    [0, CORNER_LIGHT_HEIGHT, -CORNER_LIGHT_DISTANCE],
+    [CORNER_LIGHT_DISTANCE, CORNER_LIGHT_HEIGHT, 0],
+    [-CORNER_LIGHT_DISTANCE, CORNER_LIGHT_HEIGHT, 0]
+  ];
+  cornerPositions.forEach(([x, y, z]) => {
+    const cornerLight = new THREE.PointLight(0xffffff, 2.4, 26);
+    cornerLight.position.set(x, y, z);
+    scene.add(cornerLight);
+  });
+
+  // ---- إضاءة "الوجه الخارجي" عند الزوايا: لمبات موقعها برّة حافة
+  // الجزيرة نفسها (أبعد من طرف الماسة ~14.1)، عشان ضوها يجي من
+  // الخارج ويضيء بالضبط نفس وجه الدبابيس/المباني اللي يشوفه المستخدم
+  // وهو يدور حوالين الجزيرة من برّة (مو الوجه الداخلي بس) ----
+  const OUTER_CORNER_LIGHT_DISTANCE = 16; // أبعد من طرف الماسة (~14.1) يعني برّة الجزيرة فعليًا
+  const OUTER_CORNER_LIGHT_HEIGHT = 3.5;  // واطي شوي عشان يلمس الوجه مباشرة مو من فوق بس
+  const outerCornerPositions = [
+    [0, OUTER_CORNER_LIGHT_HEIGHT, OUTER_CORNER_LIGHT_DISTANCE],
+    [0, OUTER_CORNER_LIGHT_HEIGHT, -OUTER_CORNER_LIGHT_DISTANCE],
+    [OUTER_CORNER_LIGHT_DISTANCE, OUTER_CORNER_LIGHT_HEIGHT, 0],
+    [-OUTER_CORNER_LIGHT_DISTANCE, OUTER_CORNER_LIGHT_HEIGHT, 0]
+  ];
+  outerCornerPositions.forEach(([x, y, z]) => {
+    const outerCornerLight = new THREE.PointLight(0xffffff, 1.8, 18);
+    outerCornerLight.position.set(x, y, z);
+    scene.add(outerCornerLight);
+  });
+
   const island = buildPlaceholderIsland(THREE);
   scene.add(island);
 
